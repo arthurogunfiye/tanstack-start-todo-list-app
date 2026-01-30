@@ -1,5 +1,7 @@
+import { ActionButton } from '@/components/ui/action-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Empty,
   EmptyContent,
@@ -8,10 +10,23 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import db from '@/db';
+import { cn, formatDate } from '@/lib/utils';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { createServerFn } from '@tanstack/react-start';
-import { ListTodoIcon, PlusIcon } from 'lucide-react';
+import { createServerFn, useServerFn } from '@tanstack/react-start';
+import { EditIcon, ListTodoIcon, PlusIcon, Trash2Icon } from 'lucide-react';
+import { z } from 'zod';
+import { eq } from 'drizzle-orm';
+import { todos } from '@/db/schema';
+import { useRouter } from '@tanstack/react-router';
 
 const serverLoader = createServerFn({ method: 'GET' }).handler(() => {
   return db.query.todos.findMany();
@@ -81,4 +96,82 @@ const TodoListTable = ({ todos }: { todos: Array<TodoListTableProps> }) => {
       </Empty>
     );
   }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead></TableHead>
+          <TableHead>Task</TableHead>
+          <TableHead>Created On</TableHead>
+          <TableHead className="w-0"></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {todos.map((todo) => {
+          return <TodoTableRow key={todo.id} {...todo} />;
+        })}
+      </TableBody>
+    </Table>
+  );
+};
+
+const deleteTodo = createServerFn({ method: 'POST' })
+  .inputValidator(z.object({ id: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    await db.delete(todos).where(eq(todos.id, data.id));
+
+    return { error: false };
+  });
+
+const TodoTableRow = ({
+  id,
+  name,
+  createdAt,
+  isComplete,
+}: {
+  id: string;
+  name: string;
+  createdAt: Date;
+  isComplete: boolean;
+}) => {
+  const deleteTodoFn = useServerFn(deleteTodo);
+  const router = useRouter();
+
+  return (
+    <TableRow>
+      <TableCell>
+        <Checkbox checked={isComplete} />
+      </TableCell>
+      <TableCell
+        className={cn(
+          'font-medium',
+          isComplete && 'text-muted-foreground line-through',
+        )}
+      >
+        {name}
+      </TableCell>
+      <TableCell className="text-sm text-muted-foreground">
+        {formatDate(createdAt)}
+      </TableCell>
+      <TableCell className="flex items-center justify-end gap-1">
+        <Button asChild variant="ghost" size="icon-sm">
+          <Link to="/todos/$id/edit" params={{ id }}>
+            <EditIcon />
+          </Link>
+        </Button>
+        <ActionButton
+          action={async () => {
+            const response = await deleteTodoFn({ data: { id } });
+            router.invalidate();
+            return response;
+          }}
+          variant="destructiveGhost"
+          size="icon-sm"
+        >
+          <Trash2Icon />
+        </ActionButton>
+      </TableCell>
+    </TableRow>
+  );
 };
