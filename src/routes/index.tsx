@@ -27,6 +27,7 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { todos } from '@/db/schema';
 import { useRouter } from '@tanstack/react-router';
+import { startTransition, useState } from 'react';
 
 const serverLoader = createServerFn({ method: 'GET' }).handler(() => {
   return db.query.todos.findMany();
@@ -124,6 +125,15 @@ const deleteTodo = createServerFn({ method: 'POST' })
     return { error: false };
   });
 
+const toggleTodo = createServerFn({ method: 'POST' })
+  .inputValidator(z.object({ id: z.string().min(1), isComplete: z.boolean() }))
+  .handler(async ({ data }) => {
+    await db
+      .update(todos)
+      .set({ isComplete: data.isComplete })
+      .where(eq(todos.id, data.id));
+  });
+
 const TodoTableRow = ({
   id,
   name,
@@ -136,17 +146,29 @@ const TodoTableRow = ({
   isComplete: boolean;
 }) => {
   const deleteTodoFn = useServerFn(deleteTodo);
+  const toggleTodoFn = useServerFn(toggleTodo);
+  const [isCurrentComplete, setIsCurrentComplete] = useState(isComplete);
   const router = useRouter();
 
   return (
-    <TableRow>
+    <TableRow
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('[data-actions]')) return;
+        setIsCurrentComplete((c) => !c);
+        startTransition(async () => {
+          await toggleTodoFn({ data: { id, isComplete: !isCurrentComplete } });
+          router.invalidate();
+        });
+      }}
+    >
       <TableCell>
-        <Checkbox checked={isComplete} />
+        <Checkbox checked={isCurrentComplete} />
       </TableCell>
       <TableCell
         className={cn(
           'font-medium',
-          isComplete && 'text-muted-foreground line-through',
+          isCurrentComplete && 'text-muted-foreground line-through',
         )}
       >
         {name}
@@ -154,23 +176,25 @@ const TodoTableRow = ({
       <TableCell className="text-sm text-muted-foreground">
         {formatDate(createdAt)}
       </TableCell>
-      <TableCell className="flex items-center justify-end gap-1">
-        <Button asChild variant="ghost" size="icon-sm">
-          <Link to="/todos/$id/edit" params={{ id }}>
-            <EditIcon />
-          </Link>
-        </Button>
-        <ActionButton
-          action={async () => {
-            const response = await deleteTodoFn({ data: { id } });
-            router.invalidate();
-            return response;
-          }}
-          variant="destructiveGhost"
-          size="icon-sm"
-        >
-          <Trash2Icon />
-        </ActionButton>
+      <TableCell data-actions>
+        <div className="flex items-center justify-end gap-1">
+          <Button asChild variant="ghost" size="icon-sm">
+            <Link to="/todos/$id/edit" params={{ id }}>
+              <EditIcon />
+            </Link>
+          </Button>
+          <ActionButton
+            action={async () => {
+              const response = await deleteTodoFn({ data: { id } });
+              router.invalidate();
+              return response;
+            }}
+            variant="destructiveGhost"
+            size="icon-sm"
+          >
+            <Trash2Icon />
+          </ActionButton>
+        </div>
       </TableCell>
     </TableRow>
   );
