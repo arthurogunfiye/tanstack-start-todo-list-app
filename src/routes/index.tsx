@@ -1,3 +1,4 @@
+import LocalCountButton from '@/components/LocalCountButton';
 import { ActionButton } from '@/components/ui/action-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,15 +20,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import db from '@/db';
-import { cn, formatDate } from '@/lib/utils';
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { createServerFn, useServerFn } from '@tanstack/react-start';
-import { EditIcon, ListTodoIcon, PlusIcon, Trash2Icon } from 'lucide-react';
-import { z } from 'zod';
-import { eq } from 'drizzle-orm';
 import { todos } from '@/db/schema';
-import { useRouter } from '@tanstack/react-router';
+import { cn, formatDate } from '@/lib/utils';
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router';
+import { createServerFn, useServerFn } from '@tanstack/react-start';
+import { eq } from 'drizzle-orm';
+import { EditIcon, ListTodoIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { startTransition, useState } from 'react';
+import { z } from 'zod';
 
 const serverLoader = createServerFn({ method: 'GET' }).handler(() => {
   return db.query.todos.findMany();
@@ -56,7 +56,8 @@ function App() {
             </Badge>
           )}
         </div>
-        <div>
+        <div className="flex gap-4">
+          <LocalCountButton />
           <Button size="sm" asChild>
             <Link to="/todos/new">
               <PlusIcon /> Add Todo
